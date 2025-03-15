@@ -1,0 +1,8 @@
+gpxpy
+Pillow
+python-dotenv
+asyncio
+aiohttp
+stqdm
+streamlit
+pyproj
