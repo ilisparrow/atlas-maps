@@ -37,7 +37,7 @@ from page_generation import get_filled_pages
 # TODO : Add Optional Grid
 # TODO : Clean and refactor
 # TODO : Maybe fetch all images of all pages at once.
-# TODO : Give choice OSM or IGN
+# DONE : Give choice OSM or IGN
 # TODO : Give choice add legend page
 
 load_dotenv()
@@ -49,59 +49,125 @@ Distance_in_scale_in_m = 500
 half_k_in_px = Distance_in_scale_in_m / resolution
 LINE_WIDTH = 8
 LINE_COLOR = "#B700FF"
-async def get_image_with_request_from_col_row_fast(col_row):
+TILE_SOURCE = "IGN"  # Default to IGN, can be changed to "OSM"
+
+def lat_long_to_osm_tile(lat, lon, zoom=16):
+    """Convert latitude/longitude to OSM tile coordinates"""
+    lat_rad = math.radians(lat)
+    n = 2.0 ** zoom
+    xtile = int((lon + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
+    # Calculate offset within the tile (0-256 px)
+    x_offset = ((lon + 180.0) / 360.0 * n - xtile) * 256
+    y_offset = ((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n - ytile) * 256
+    return xtile, ytile, x_offset, y_offset
+
+def vectorized_lat_long_to_osm_tile(lats, longs, zoom=16):
+    """Vectorized version to convert multiple points to OSM tile coordinates"""
+    lats_rad = np.radians(lats)
+    n = 2.0 ** zoom
+    
+    xtiles = ((longs + 180.0) / 360.0 * n).astype(int)
+    ytiles = ((1.0 - np.log(np.tan(lats_rad) + (1 / np.cos(lats_rad))) / np.pi) / 2.0 * n).astype(int)
+    
+    # Calculate offsets within tiles (0-256 px)
+    x_offsets = ((longs + 180.0) / 360.0 * n - xtiles) * 256
+    y_offsets = ((1.0 - np.log(np.tan(lats_rad) + (1 / np.cos(lats_rad))) / np.pi) / 2.0 * n - ytiles) * 256
+    
+    return xtiles, ytiles, x_offsets, y_offsets
+
+async def get_image_with_request_from_col_row_fast(col_row, tile_source=TILE_SOURCE):
     async with aiohttp.ClientSession() as session:
-        #url = f"https://wxs.ign.fr/{IGN_KEY}/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=16&TILEROW={col_row[1]}&TILECOL={col_row[0]}&FORMAT=image%2Fjpeg"
-        url = f"https://data.geopf.fr/private/wmts?apikey=ign_scan_ws&SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=16&TILEROW={col_row[1]}&TILECOL={col_row[0]}&FORMAT=image%2Fjpeg"
+        if tile_source.upper() == "IGN":
+            # IGN tile URL
+            url = f"https://data.geopf.fr/private/wmts?apikey=ign_scan_ws&SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=16&TILEROW={col_row[1]}&TILECOL={col_row[0]}&FORMAT=image%2Fjpeg"
+            
+            async with session.get(url) as response:
+                if response.status != 200:
+                    # If IGN request fails, create a blank tile
+                    image = Image.new("RGB", (256, 256), (240, 240, 240))
+                    draw = ImageDraw.Draw(image)
+                    draw.text((10, 120), f"Tile: {col_row[0]},{col_row[1]}", fill=(0, 0, 0))
+                    draw.rectangle((0, 0, 255, 255), outline=(0, 0, 0), width=1)
+                    return col_row, image
+                
+                image_data = await response.read()
+        
+        elif tile_source.upper() == "OSM":
+            # OSM tile URL
+            zoom_level = 16  # Same zoom level as IGN
+            url = f"https://a.tile.openstreetmap.org/{zoom_level}/{col_row[0]}/{col_row[1]}.png"
+            
+            # Create proper headers for OSM - they require a User-Agent
+            headers = {
+                "User-Agent": "GPX Map Generator/1.0",
+                "Accept": "image/png,image/*;q=0.9"
+            }
+            
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    # If the request fails, create a blank image with the tile coordinates
+                    image = Image.new("RGB", (256, 256), (240, 240, 240))
+                    draw = ImageDraw.Draw(image)
+                    draw.text((10, 120), f"Tile: {col_row[0]},{col_row[1]}", fill=(0, 0, 0))
+                    draw.rectangle((0, 0, 255, 255), outline=(0, 0, 0), width=1)
+                    return col_row, image
+                
+                image_data = await response.read()
 
-        async with session.get(url) as response:
-            image_data = await response.read()
-
-    # Process the image data if necessary and return the image
-    image = Image.open(io.BytesIO(image_data))
-    return col_row, image
-
-
-def get_tile_number_from_coord(lat, long):
-    # Taken from here https://geoservices.ign.fr/documentation/services/api-et-services-ogc/images-tuilees-wmts-ogc#1592
-    # Doing this at resolution 16
-    TRAN_4326_TO_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857")
-    # ORiginal coordinates for our resolution
-    # resolution = 0.5971642835#meters per px
-    tile_size_in_meters = 256 * resolution
-    x0, y0 = -20037508, 20037508
-    x, y = TRAN_4326_TO_3857.transform(lat, long)
-    delta_x, delta_y = x - x0 - (resolution * 205), y0 - y - (
-        resolution * 146
-    )  # TODO: FIXE For some reason their is an offset, maybe it has to do with the way the tiles are fetched
-    col, row = delta_x // tile_size_in_meters, delta_y // tile_size_in_meters
-    offset_x, offset_y = ((delta_x % tile_size_in_meters) / resolution), (
-        delta_y % tile_size_in_meters / resolution
-    )
-    return col, row, offset_x, offset_y
+    try:
+        # Process the image data if necessary and return the image
+        image = Image.open(io.BytesIO(image_data))
+        return col_row, image
+    except Exception as e:
+        # Fallback if image can't be opened
+        print(f"Error opening tile at {col_row}: {e}")
+        image = Image.new("RGB", (256, 256), (240, 240, 240))
+        draw = ImageDraw.Draw(image)
+        draw.text((10, 120), f"Error: {col_row[0]},{col_row[1]}", fill=(255, 0, 0))
+        draw.rectangle((0, 0, 255, 255), outline=(255, 0, 0), width=1)
+        return col_row, image
 
 
-def vectorized_get_tile_number_from_coord(lats, longs):
-    # Create transformer object for repeated use
-    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+def get_tile_number_from_coord(lat, long, tile_source=TILE_SOURCE):
+    if tile_source.upper() == "OSM":
+        # Use OSM tile numbering
+        return lat_long_to_osm_tile(lat, long)
+    else:
+        # Original IGN code
+        TRAN_4326_TO_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857")
+        # ORiginal coordinates for our resolution
+        # resolution = 0.5971642835#meters per px
+        tile_size_in_meters = 256 * resolution
+        x0, y0 = -20037508, 20037508
+        x, y = TRAN_4326_TO_3857.transform(lat, long)
+        delta_x, delta_y = x - x0 - (resolution * 205), y0 - y - (
+            resolution * 146
+        )  # TODO: FIXE For some reason their is an offset, maybe it has to do with the way the tiles are fetched
+        col, row = delta_x // tile_size_in_meters, delta_y // tile_size_in_meters
+        offset_x, offset_y = ((delta_x % tile_size_in_meters) / resolution), (
+            delta_y % tile_size_in_meters / resolution
+        )
+        return col, row, offset_x, offset_y
 
-    # Perform transformation
-    xs, ys = transformer.transform(longs, lats)
 
-    # Constants setup
-    tile_size_in_meters = 256 * resolution
-    x0, y0 = -20037508, 20037508
-
-    # Calculate columns and rows for tiles
-    delta_xs = xs - x0 - (resolution * 205)
-    delta_ys = y0 - ys - (resolution * 146)
-
-    cols = np.floor(delta_xs / tile_size_in_meters)
-    rows = np.floor(delta_ys / tile_size_in_meters)
-    offset_xs = (delta_xs % tile_size_in_meters) / resolution
-    offset_ys = (delta_ys % tile_size_in_meters) / resolution
-
-    return cols, rows, offset_xs, offset_ys
+def vectorized_get_tile_number_from_coord(lats, longs, tile_source=TILE_SOURCE):
+    if tile_source.upper() == "OSM":
+        # Use OSM tile calculation
+        return vectorized_lat_long_to_osm_tile(lats, longs)
+    else:
+        # Original IGN code
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        xs, ys = transformer.transform(longs, lats)
+        tile_size_in_meters = 256 * resolution
+        x0, y0 = -20037508, 20037508
+        delta_xs = xs - x0 - (resolution * 205)
+        delta_ys = y0 - ys - (resolution * 146)
+        cols = np.floor(delta_xs / tile_size_in_meters)
+        rows = np.floor(delta_ys / tile_size_in_meters)
+        offset_xs = (delta_xs % tile_size_in_meters) / resolution
+        offset_ys = (delta_ys % tile_size_in_meters) / resolution
+        return cols, rows, offset_xs, offset_ys
 
 
 def annotate_image(image, number, position, rectangle_position):
@@ -335,8 +401,7 @@ def displayPDF(file):
         base64_pdf = base64.b64encode(f.read()).decode("utf-8")
         return base64_pdf
 
-async def main(gpx):
-
+async def main(gpx, tile_source=TILE_SOURCE):
     # Get all the track points from the GPX file
     track_points = gpx.get_points_data()
 
@@ -353,9 +418,10 @@ async def main(gpx):
             # Assume each segment.points is a list of objects with .latitude and .longitude attributes
             data = pd.DataFrame([(p.latitude, p.longitude) for p in segment.points], columns=['lat', 'long'])
 
-            # Vectorized coordinate transformation
-            cols, rows, offset_xs, offset_ys = vectorized_get_tile_number_from_coord(data['lat'].values,
-                                                                                     data['long'].values)
+            # Vectorized coordinate transformation - pass tile_source
+            cols, rows, offset_xs, offset_ys = vectorized_get_tile_number_from_coord(
+                data['lat'].values, data['long'].values, tile_source
+            )
 
             # Processing results
             for i, (col, row, ox, oy) in enumerate(zip(cols, rows, offset_xs, offset_ys)):
@@ -388,7 +454,7 @@ async def main(gpx):
         tasks = []
         for col_row in flattened_list:
             task = asyncio.create_task(
-                get_image_with_request_from_col_row_fast(col_row)
+                get_image_with_request_from_col_row_fast(col_row, tile_source)
             )
             tasks.append(task)
 
@@ -423,9 +489,7 @@ async def main(gpx):
         global_image = annotate_image(
             global_image, page_number, (20, 20), (20, 75, 20 + half_k_in_px, 80)
         )
-        # global_image.save(folderpath+"/"+f"col : {col}, row : {row}_{page_number}"+'.jpg',quality=80,optimize=True)
-        # For debug
-        # gpx_trace_img.save(folderpath+"/"+f"col : {col}, row : {row}_{page_number}_trace"+'.jpg',quality=80,optimize=True)
+        
         image_pages_for_export.append(copy.deepcopy(global_image))
         page_number += 1
 
@@ -450,6 +514,3 @@ async def main(gpx):
         )
 
     return file_name
-
-
-
