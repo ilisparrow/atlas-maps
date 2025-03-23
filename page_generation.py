@@ -1,61 +1,74 @@
-
-
 import math
 
-def put_tiles_in_pages (tiles,NUMBER_ROWS,NUMBER_COLUMNS):
-    full_processed_list =  []
-    pages=[]
-    for tile_of_ref in tiles : 
-        if tile_of_ref not in full_processed_list:
-            min_row = tile_of_ref[1]
-            min_col = tile_of_ref[0]
-            page_one = []
-            for idx, tile in enumerate(tiles) : 
-                if tile not in full_processed_list:
-                    delta_x = min_row-tile[1]
-                    delta_y = min_col-tile[0]
-                    if(abs(delta_y)<NUMBER_ROWS and abs(delta_x)<NUMBER_COLUMNS):
-                        page_one.append(tile)
-                        full_processed_list.append(tile)
-                        min_col = tile[0] if tile[0]<min_col else min_col
-                        min_row = tile[1] if tile[1]<min_row else min_row
-                    else :
-                        pass
-            pages.append(page_one)
+def put_tiles_in_pages(tiles, NUMBER_ROWS, NUMBER_COLUMNS):
+    processed_tiles = set()
+    pages = []
+    
+    for tile in tiles:
+        if tile in processed_tiles:
+            continue
+        
+        # Create a new page with this tile as a reference
+        ref_col, ref_row = tile
+        
+        # Try different positions for the page to maximize coverage of unprocessed tiles
+        best_corner = (ref_col, ref_row)
+        best_coverage = 0
+        
+        for col_offset in range(-NUMBER_COLUMNS + 1, 1):
+            for row_offset in range(-NUMBER_ROWS + 1, 1):
+                min_col = ref_col + col_offset
+                min_row = ref_row + row_offset
+                max_col = min_col + NUMBER_COLUMNS - 1
+                max_row = min_row + NUMBER_ROWS - 1
+                
+                # Count how many unprocessed tiles would be covered
+                coverage = sum(1 for t in tiles if t not in processed_tiles and 
+                              min_col <= t[0] <= max_col and min_row <= t[1] <= max_row)
+                
+                if coverage > best_coverage:
+                    best_coverage = coverage
+                    best_corner = (min_col, min_row)
+        
+        # Create a page with the best corner
+        min_col, min_row = best_corner
+        max_col = min_col + NUMBER_COLUMNS - 1
+        max_row = min_row + NUMBER_ROWS - 1
+        
+        # Add all tiles within this page
+        page_tiles = []
+        for t in tiles:
+            col, row = t
+            if min_col <= col <= max_col and min_row <= row <= max_row:
+                page_tiles.append(t)
+                if t not in processed_tiles:
+                    processed_tiles.add(t)
+        
+        pages.append(page_tiles)
+    
     return pages
 
+def get_first_tile_page(page):
+    # Find the smallest column and row (top-left corner)
+    smallest_col = min(tile[0] for tile in page)
+    smallest_row = min(tile[1] for tile in page)
+    return smallest_col, smallest_row
 
-
-
-def get_first_tile_page (page):
-    # Sort the data by row (the first element of the tuple) and then by column (the second element of the tuple)
-    smallest_row = sorted(page, key=lambda x: (x[0]))[0][0]
-    smallest_col = sorted(page, key=lambda x: (x[1]))[0][1]
-    return smallest_row,smallest_col
-
-def fill_page (corner_tile,NUMBER_ROWS,NUMBER_COLUMNS):
+def fill_page(corner_tile, NUMBER_ROWS, NUMBER_COLUMNS):
     col, row = corner_tile
-    page = [[(0,0)] * NUMBER_ROWS for _ in range(NUMBER_COLUMNS)]
+    page = [[(0, 0)] * NUMBER_ROWS for _ in range(NUMBER_COLUMNS)]
     for i in range(NUMBER_COLUMNS):
         for j in range(NUMBER_ROWS):
-            page[i][j]=(col+i,row+j)
+            page[i][j] = (col + i, row + j)
     return page             
 
-
-def get_filled_pages(tiles,max_col,max_row):
+def get_filled_pages(tiles, max_col, max_row):
     filled_pages = []
-
     NUMBER_COLUMNS = max_col
     NUMBER_ROWS = max_row
-    pages = put_tiles_in_pages (tiles,NUMBER_ROWS,NUMBER_COLUMNS)
-
-    for page in pages :
+    pages = put_tiles_in_pages(tiles, NUMBER_ROWS, NUMBER_COLUMNS)
+    for page in pages:
         corner_tile = get_first_tile_page(page)
-        filled_page = fill_page(corner_tile,NUMBER_ROWS,NUMBER_COLUMNS)
+        filled_page = fill_page(corner_tile, NUMBER_ROWS, NUMBER_COLUMNS)
         filled_pages.append(filled_page)
-
     return filled_pages
-
-
-
-
