@@ -16,6 +16,13 @@ st.title("Atlas creator from GPX")
 # File uploader for a single GPX file
 uploaded_file = st.file_uploader("Choose a GPX file", accept_multiple_files=False, type=["gpx"])
 
+# Add a selector for tile source
+tile_source = st.selectbox(
+    "Select map tile source",
+    options=["IGN", "OSM"],
+    index=0  # Default to IGN
+)
+
 # Button to trigger the generation
 button_pressed = st.button("Generate !")
 
@@ -30,9 +37,12 @@ if uploaded_file and button_pressed:
 
         # Prepare the file in the correct format for the API
         files = {'gpx_file': (file_name, file_content, 'application/gpx+xml')}
+        
+        # Add the tile_source parameter to the request
+        params = {'_tile_source': tile_source}
 
         # Sending the POST request
-        response = requests.post(url, files=files)
+        response = requests.post(url, files=files, params=params)
 
         # Check if the request was successful
         if response.status_code == 200:
