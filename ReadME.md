@@ -50,7 +50,7 @@ modal deploy modal_backend.py
 - [ ] Add optional grid overlay
 - [ ] Clean and refactor codebase
 - [ ] Optimize by fetching all page images at once
-- [ ] Add choice between OSM and IGN maps
+- [x] Add choice between OSM and IGN maps
 - [ ] Add optional legend page
 
 ## Contributing
