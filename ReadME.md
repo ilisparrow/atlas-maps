@@ -2,10 +2,16 @@
 
 A simple tool that converts GPX tracks into beautiful PDF maps using IGN (French National Geographic Institute) tiles.
 
+## Screenshots
+
+![Main UI](./doc/screenshot-0.png)
+![OSM example, works world wide](./doc/screenshot-1.png)
+![IGN example (Works only for France)](./doc/screenshot-2.png)
+
 ## Architecture
 
-- Backend: Serverless computation using Modal
 - Frontend: Web interface hosted on a private VPS
+- Backend: Serverless computation using Modal
 - Processing: Asynchronous tile fetching and PDF generation
 
 ## Quick Start
@@ -43,15 +49,17 @@ modal deploy modal_backend.py
 - [x] Add progress bar with sttqdm
 - [x] Make color and line thickness configurable
 - [ ] Add Portrait/Landscape orientation choice
-- [ ] For some reason there is no deploy.sh
+- [x] For some reason there is no deploy.sh
 - [ ] Make number of tiles variable
 - [ ] Add A4/A3 paper size options
 - [ ] Deploy a small pocketbase or sqlite for GPX file storage
 - [ ] Add optional grid overlay
 - [ ] Clean and refactor codebase
-- [ ] Optimize by fetching all page images at once
+- [x] Optimize by fetching all page images at once
 - [x] Add choice between OSM and IGN maps
 - [ ] Add optional legend page
+
+
 
 ## Contributing
 
