@@ -413,21 +413,21 @@ async def main(gpx, tile_source=TILE_SOURCE):
     list_index_found = set()
     gpx_points = defaultdict(list)
 
+    point_index = 0
     for track in gpx.tracks:
         for segment in track.segments:
-            # Assume each segment.points is a list of objects with .latitude and .longitude attributes
             data = pd.DataFrame([(p.latitude, p.longitude) for p in segment.points], columns=['lat', 'long'])
-
-            # Vectorized coordinate transformation - pass tile_source
+            
             cols, rows, offset_xs, offset_ys = vectorized_get_tile_number_from_coord(
                 data['lat'].values, data['long'].values, tile_source
             )
-
-            # Processing results
+            
             for i, (col, row, ox, oy) in enumerate(zip(cols, rows, offset_xs, offset_ys)):
                 point = segment.points[i]
-                gpx_points[(col, row)].append((ox, oy, point.latitude))
+                # Add sequence number (point_index) to stored data
+                gpx_points[(col, row)].append((ox, oy, point.latitude, point_index))
                 list_index_found.add((col, row))
+                point_index += 1
 
     # Convert set back to list if needed
     list_index_found = list(list_index_found)
@@ -444,9 +444,15 @@ async def main(gpx, tile_source=TILE_SOURCE):
             tile_pos = get_pos_gpx_in_px_in_page(_page, key)
             if not tile_pos == None:
                 for point in gpx_points[key]:
+                    # Include sequence index in collected points
                     list_post.append(
-                        copy.deepcopy((tile_pos[0] + point[0], tile_pos[1] + point[1]))
+                        (tile_pos[0] + point[0], tile_pos[1] + point[1], point[3])
                     )
+        
+        # Sort points by sequence index before drawing
+        list_post.sort(key=lambda x: x[2])
+        # Remove sequence index for drawing
+        list_post = [(x[0], x[1]) for x in list_post]
 
         ###############
         #'''

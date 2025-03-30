@@ -54,7 +54,7 @@ modal deploy modal_backend.py
 - [ ] Add A4/A3 paper size options
 - [ ] Deploy a small pocketbase or sqlite for GPX file storage
 - [ ] Add optional grid overlay
-- [ ] Clean and refactor codebase
+- [x] Clean and refactor codebase
 - [x] Optimize by fetching all page images at once
 - [x] Add choice between OSM and IGN maps
 - [ ] Add optional legend page
