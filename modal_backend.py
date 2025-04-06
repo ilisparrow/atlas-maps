@@ -44,10 +44,10 @@ streamlit_font_bold_mount = modal.Mount.from_local_file("fonts/FreeMonoBold.ttf"
     image=image,
     mounts=[streamlit_script_mount,streamlit_utils_mount,streamlit_env_mount,streamlit_icon_mount,streamlit_font_mount,streamlit_font_bold_mount],)
 @web_endpoint(method="POST")
-async def run(gpx_file: UploadFile = File(...),_tile_source:str = "IGN"):
+async def run(gpx_file: UploadFile = File(...), _tile_source:str = "IGN", _line_color:str = "#B700FF"):
     contents = await gpx_file.read()
     gpx = gpxpy.parse(contents.decode('utf-8'))
-    file_path = await main(gpx,tile_source =_tile_source)
+    file_path = await main(gpx, tile_source=_tile_source, line_color=_line_color)
 
     return FileResponse(
         file_path,

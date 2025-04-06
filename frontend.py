@@ -16,12 +16,27 @@ st.title("Atlas creator from GPX")
 # File uploader for a single GPX file
 uploaded_file = st.file_uploader("Choose a GPX file", accept_multiple_files=False, type=["gpx"])
 
+# Create a sidebar for configuration options
+st.sidebar.header("Map Configuration")
+
 # Add a selector for tile source
-tile_source = st.selectbox(
+tile_source = st.sidebar.selectbox(
     "Select map tile source",
-    options=["IGN", "OSM"],
-    index=0  # Default to IGN
+    options=["IGN", "OSM", "TOPO"],
+    index=0,  # Default to IGN
+    help="IGN: French National Geographic Institute (works best in France)\nOSM: OpenStreetMap (worldwide)\nTOPO: OpenTopoMap (worldwide with topographic lines)"
 )
+
+# Add a color picker for the track line
+line_color = st.sidebar.color_picker(
+    "Track line color",
+    value="#B700FF",  # Default purple color
+    help="Choose the color for the GPX track line"
+)
+
+# Add a note about IGN maps
+if tile_source == "IGN":
+    st.sidebar.info("IGN maps are optimized for France. For other regions, consider using OSM or TOPO.")
 
 # Button to trigger the generation
 button_pressed = st.button("Generate !")
@@ -38,8 +53,11 @@ if uploaded_file and button_pressed:
         # Prepare the file in the correct format for the API
         files = {'gpx_file': (file_name, file_content, 'application/gpx+xml')}
         
-        # Add the tile_source parameter to the request
-        params = {'_tile_source': tile_source}
+        # Add the parameters to the request
+        params = {
+            '_tile_source': tile_source,
+            '_line_color': line_color
+        }
 
         # Sending the POST request
         response = requests.post(url, files=files, params=params)
@@ -53,11 +71,13 @@ if uploaded_file and button_pressed:
                 pdf_data = f.read()
 
             # Allow the user to download the PDF
+            st.success("Atlas generated successfully!")
             st.download_button(label="Download PDF", data=response.content, file_name="atlas.pdf", mime="application/pdf")
 
         else:
-            st.error("Failed to generate the PDF. Please try again.")
+            st.error(f"Failed to generate the PDF. Status code: {response.status_code}")
+            st.error("Please try again or try with a different tile source.")
 
 # Footer captions
 st.caption("For suggestions, or bugs please feel free to reach out at: contact(at)iliasamri.com")
-st.caption("All of this is possible thanks to multiple open source projects, data from IGN, icon from maxicons/flaticon.")
+st.caption("All of this is possible thanks to multiple open source projects, data from IGN, OpenStreetMap, OpenTopoMap, icon from maxicons/flaticon.")

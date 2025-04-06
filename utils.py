@@ -51,7 +51,7 @@ LINE_WIDTH = 8
 LINE_COLOR = "#B700FF"
 TILE_SOURCE = "IGN"  # Default to IGN, can be changed to "OSM"
 
-def lat_long_to_osm_tile(lat, lon, zoom=16):
+def lat_long_to_osm_tile(lat, lon, zoom=15):
     """Convert latitude/longitude to OSM tile coordinates"""
     lat_rad = math.radians(lat)
     n = 2.0 ** zoom
@@ -62,7 +62,7 @@ def lat_long_to_osm_tile(lat, lon, zoom=16):
     y_offset = ((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n - ytile) * 256
     return xtile, ytile, x_offset, y_offset
 
-def vectorized_lat_long_to_osm_tile(lats, longs, zoom=16):
+def vectorized_lat_long_to_osm_tile(lats, longs, zoom=15):
     """Vectorized version to convert multiple points to OSM tile coordinates"""
     lats_rad = np.radians(lats)
     n = 2.0 ** zoom
@@ -76,6 +76,12 @@ def vectorized_lat_long_to_osm_tile(lats, longs, zoom=16):
     
     return xtiles, ytiles, x_offsets, y_offsets
 
+# Update tile source options in utils.py
+
+# Replace the TILE_SOURCE line with:
+TILE_SOURCE = "IGN"  # Default to IGN, can be changed to "OSM" or "TOPO"
+
+# In the get_image_with_request_from_col_row_fast function, modify or add the OpenTopoMap option:
 async def get_image_with_request_from_col_row_fast(col_row, tile_source=TILE_SOURCE):
     async with aiohttp.ClientSession() as session:
         if tile_source.upper() == "IGN":
@@ -95,8 +101,8 @@ async def get_image_with_request_from_col_row_fast(col_row, tile_source=TILE_SOU
         
         elif tile_source.upper() == "OSM":
             # OSM tile URL
-            zoom_level = 16  # Same zoom level as IGN
-            url = f"https://a.tile.openstreetmap.org/{zoom_level}/{col_row[0]}/{col_row[1]}.png"
+            zoom_level = 15  # Same zoom level as IGN
+            url = f"https://a.tile.openstreetmap.org/{zoom_level}/{int(col_row[0])}/{int(col_row[1])}.png"
             
             # Create proper headers for OSM - they require a User-Agent
             headers = {
@@ -112,6 +118,34 @@ async def get_image_with_request_from_col_row_fast(col_row, tile_source=TILE_SOU
                     draw.text((10, 120), f"Tile: {col_row[0]},{col_row[1]}", fill=(0, 0, 0))
                     draw.rectangle((0, 0, 255, 255), outline=(0, 0, 0), width=1)
                     return col_row, image
+                
+                image_data = await response.read()
+                
+        elif tile_source.upper() == "TOPO":
+            # OpenTopoMap tile URL
+            zoom_level = 15  # Using zoom level 15 as in the working example
+            url = f"https://a.tile.opentopomap.org/{zoom_level}/{int(col_row[0])}/{int(col_row[1])}.png"
+            # Create proper headers - using the exact headers from the working curl command
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:137.0) Gecko/20100101 Firefox/137.0",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "cross-site"
+            }
+            
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    # If the request fails, create a blank image with the tile coordinates
+                    image = Image.new("RGB", (256, 256), (240, 240, 240))
+                    draw = ImageDraw.Draw(image)
+                    draw.text((10, 120), f"Tile: {col_row[0]},{col_row[1]}", fill=(0, 0, 0))
+                    draw.rectangle((0, 0, 255, 255), outline=(0, 0, 0), width=1)
+                    return col_row, image 
                 
                 image_data = await response.read()
 
@@ -130,7 +164,7 @@ async def get_image_with_request_from_col_row_fast(col_row, tile_source=TILE_SOU
 
 
 def get_tile_number_from_coord(lat, long, tile_source=TILE_SOURCE):
-    if tile_source.upper() == "OSM":
+    if tile_source.upper() in ["OSM", "TOPO"]:
         # Use OSM tile numbering
         return lat_long_to_osm_tile(lat, long)
     else:
@@ -152,7 +186,7 @@ def get_tile_number_from_coord(lat, long, tile_source=TILE_SOURCE):
 
 
 def vectorized_get_tile_number_from_coord(lats, longs, tile_source=TILE_SOURCE):
-    if tile_source.upper() == "OSM":
+    if tile_source.upper() in ["OSM", "TOPO"]:
         # Use OSM tile calculation
         return vectorized_lat_long_to_osm_tile(lats, longs)
     else:
@@ -334,7 +368,7 @@ def append_or_create_point(
     return gpx_points
 
 
-def draw_line(list_of_circles, original_image):
+def draw_line(list_of_circles, original_image, line_color=LINE_COLOR):
     image = Image.new("RGB", original_image.size, "black")
     mask = Image.new("L", original_image.size, "black")
 
@@ -357,7 +391,7 @@ def draw_line(list_of_circles, original_image):
                     list_of_circles[idx + 1][0],
                     list_of_circles[idx + 1][1],
                 ),
-                fill=LINE_COLOR,
+                fill=line_color,
                 width=LINE_WIDTH,
             )
             draw_mask.line(
@@ -401,7 +435,7 @@ def displayPDF(file):
         base64_pdf = base64.b64encode(f.read()).decode("utf-8")
         return base64_pdf
 
-async def main(gpx, tile_source=TILE_SOURCE):
+async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
     # Get all the track points from the GPX file
     track_points = gpx.get_points_data()
 
@@ -475,7 +509,8 @@ async def main(gpx, tile_source=TILE_SOURCE):
         stitched_horizontal = [get_concat_v_blank_gpt(*row) for row in grid]
         global_image = get_concat_h_blank_gpt(*stitched_horizontal)
 
-        gpx_trace_img, mask = draw_line(list_post, global_image)
+        # Use the custom line color parameter here
+        gpx_trace_img, mask = draw_line(list_post, global_image, line_color)
 
         today = str(datetime.date.today()).replace("-", "")
         folderpath = "./output/" + today

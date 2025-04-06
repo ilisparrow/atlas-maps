@@ -52,12 +52,15 @@ modal deploy modal_backend.py
 - [x] For some reason there is no deploy.sh
 - [ ] Make number of tiles variable
 - [ ] Add A4/A3 paper size options
-- [ ] Deploy a small pocketbase or sqlite for GPX file storage
-- [ ] Add optional grid overlay
 - [x] Clean and refactor codebase
 - [x] Optimize by fetching all page images at once
 - [x] Add choice between OSM and IGN maps
 - [ ] Add optional legend page
+- [ ] Add analytics (streamlit analytics)
+- [x] Add choice of color for the Trace
+- [x] Add Open Topo Map
+- [ ] WHen mutiple segments of gpx but unrelated, they are still conected
+- [ ] Check if the scale is always correct.
 
 
 
