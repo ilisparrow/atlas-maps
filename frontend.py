@@ -1,17 +1,18 @@
 import os
-
 import streamlit as st
+import streamlit_analytics2 as streamlit_analytics
 import requests
 from io import BytesIO
 
 from dotenv import load_dotenv
-
 # Set page configuration
 st.set_page_config(layout="wide", page_title="Atlas Generator", page_icon="./icon.ico")
 load_dotenv()
 SERVERLESS_ADDRESS = os.getenv('SERVERLESS_ADDRESS')
 # Page title
 st.title("Atlas creator from GPX")
+streamlit_analytics.start_tracking(load_from_json="analytics.json")
+streamlit_analytics.track()
 
 # File uploader for a single GPX file
 uploaded_file = st.file_uploader("Choose a GPX file", accept_multiple_files=False, type=["gpx"])
@@ -77,7 +78,7 @@ if uploaded_file and button_pressed:
         else:
             st.error(f"Failed to generate the PDF. Status code: {response.status_code}")
             st.error("Please try again or try with a different tile source.")
-
+streamlit_analytics.stop_tracking(save_to_json="analytics.json",unsafe_password=os.getenv("ANALYTICS_PASS"))
 # Footer captions
 st.caption("For suggestions, or bugs please feel free to reach out at: contact(at)iliasamri.com")
 st.caption("All of this is possible thanks to multiple open source projects, data from IGN, OpenStreetMap, OpenTopoMap, icon from maxicons/flaticon.")

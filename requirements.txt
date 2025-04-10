@@ -6,3 +6,4 @@ aiohttp
 stqdm
 streamlit
 pyproj
+streamlit-analytics2

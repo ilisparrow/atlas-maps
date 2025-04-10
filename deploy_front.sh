@@ -9,7 +9,7 @@ echo
 
 # Create archive of all necessary files
 echo "Creating archive..."
-tar -czf atlas.tar.gz Dockerfile requirements.txt .env frontend.py fonts/
+tar -czf atlas.tar.gz Dockerfile requirements.txt .env frontend.py .streamlit/ fonts/
 
 # Send archive to server
 echo "Sending files to server..."
@@ -28,12 +28,10 @@ sshpass -p "$PASSWORD" ssh $USER@$SERVER_IP << 'EOF'
   docker stop atlas-container 2>/dev/null || true
   docker rm atlas-container 2>/dev/null || true
   
-  # Create output directory
-  mkdir -p ~/atlas/output
   
   # Run new container
   docker run -d --name atlas-container -p 8508:80 \
-    -v ~/atlas/output:/app/output \
+    -v ~/atlas:/app \
     --restart unless-stopped \
     atlas-app
   

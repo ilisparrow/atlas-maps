@@ -20,5 +20,5 @@ COPY . .
 RUN mkdir "/usr/share/fonts/truetype/freefont/"
 RUN cp /app/fonts/* /usr/share/fonts/truetype/freefont/
 
-ENTRYPOINT ["streamlit", "run", "frontend.py", "--server.port=80", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "frontend.py", "--server.port=80", "--server.address=0.0.0.0","--client.showErrorDetails=false"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
