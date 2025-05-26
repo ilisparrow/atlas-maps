@@ -436,18 +436,18 @@ def displayPDF(file):
         return base64_pdf
 
 async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
+    print(f"DEBUG: utils.main received tile_source: {tile_source}")
     # Get all the track points from the GPX file
-    track_points = gpx.get_points_data()
+    # track_points = gpx.get_points_data() # This variable is not directly used later. GPX points are processed from tracks and segments.
 
-    tiles = []
-    gpx_in_px = []
-    gpx_points = {}
-    page = [[(0, 0)] * NUMBER_ROWS for _ in range(NUMBER_COLUMNS)]
+    # Initialize new data structures
+    ordered_unique_track_tiles = []
+    seen_tiles_for_order = set() 
+    all_track_tiles_set = set()
 
-    list_index_found = set()
     gpx_points = defaultdict(list)
-
     point_index = 0
+
     for track in gpx.tracks:
         for segment in track.segments:
             data = pd.DataFrame([(p.latitude, p.longitude) for p in segment.points], columns=['lat', 'long'])
@@ -456,17 +456,29 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
                 data['lat'].values, data['long'].values, tile_source
             )
             
-            for i, (col, row, ox, oy) in enumerate(zip(cols, rows, offset_xs, offset_ys)):
+            for i, (col_float, row_float, ox, oy) in enumerate(zip(cols, rows, offset_xs, offset_ys)):
                 point = segment.points[i]
+                # Cast col and row to int, as tile indices must be integers
+                col = int(col_float)
+                row = int(row_float)
+                current_tile = (col, row) 
+
                 # Add sequence number (point_index) to stored data
-                gpx_points[(col, row)].append((ox, oy, point.latitude, point_index))
-                list_index_found.add((col, row))
+                gpx_points[current_tile].append((ox, oy, point.latitude, point_index))
+                
+                # Populate all_track_tiles_set
+                all_track_tiles_set.add(current_tile)
+                
+                # Populate ordered_unique_track_tiles, preserving order of first appearance
+                if current_tile not in seen_tiles_for_order:
+                    ordered_unique_track_tiles.append(current_tile)
+                    seen_tiles_for_order.add(current_tile)
+                
                 point_index += 1
 
-    # Convert set back to list if needed
-    list_index_found = list(list_index_found)
-
-    pages = get_filled_pages(list_index_found, NUMBER_COLUMNS, NUMBER_ROWS)
+    # The old list_index_found set and its conversion to list are removed.
+    # Update the call to get_filled_pages to use ordered_unique_track_tiles and all_track_tiles_set
+    pages = get_filled_pages(ordered_unique_track_tiles, all_track_tiles_set, NUMBER_COLUMNS, NUMBER_ROWS)
 
     global_image = None
     image_pages_for_export = []
@@ -554,4 +566,4 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
             append_images=image_pages_for_export[1:],
         )
 
-    return file_name
+    return file_name, len(image_pages_for_export)
