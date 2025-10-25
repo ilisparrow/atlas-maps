@@ -80,5 +80,6 @@ if uploaded_file and button_pressed:
             st.error("Please try again or try with a different tile source.")
 streamlit_analytics.stop_tracking(save_to_json="analytics.json",unsafe_password=os.getenv("ANALYTICS_PASS"))
 # Footer captions
-st.caption("For suggestions, or bugs please feel free to reach out at: contact(at)iliasamri.com")
+st.caption("For suggestions, or bugs please feel free to reach out at: 4880273+ilisparrow@users.noreply.github.com")
+st.caption("https://github.com/ilisparrow/atlas-maps")
 st.caption("All of this is possible thanks to multiple open source projects, data from IGN, OpenStreetMap, OpenTopoMap, icon from maxicons/flaticon.")
