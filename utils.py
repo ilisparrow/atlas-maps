@@ -204,6 +204,124 @@ def vectorized_get_tile_number_from_coord(lats, longs, tile_source=TILE_SOURCE):
         return cols, rows, offset_xs, offset_ys
 
 
+def draw_navigation_marker(draw, direction, position, page_num):
+    """
+    Draw a navigation marker showing next/previous page direction.
+
+    Args:
+        draw: ImageDraw object
+        direction: "up", "down", "left", "right", "up-left", "up-right", "down-left", "down-right"
+        position: (x, y) center position
+        page_num: page number to display
+    """
+    marker_size = 60
+    font_small = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeMono.ttf", 24)
+    font_bold = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf", 24)
+
+    x, y = position
+
+    # Draw background circle
+    draw.ellipse(
+        [(x - marker_size//2, y - marker_size//2),
+         (x + marker_size//2, y + marker_size//2)],
+        fill=(255, 255, 255),
+        outline=(0, 0, 0),
+        width=3
+    )
+
+    # Draw arrow based on direction
+    arrow_len = 20
+    if "up" in direction:
+        # Up arrow
+        draw.line([(x, y - arrow_len), (x, y + arrow_len)], fill=(0, 0, 0), width=3)
+        draw.line([(x, y - arrow_len), (x - 8, y - arrow_len + 8)], fill=(0, 0, 0), width=3)
+        draw.line([(x, y - arrow_len), (x + 8, y - arrow_len + 8)], fill=(0, 0, 0), width=3)
+    if "down" in direction:
+        # Down arrow
+        draw.line([(x, y - arrow_len), (x, y + arrow_len)], fill=(0, 0, 0), width=3)
+        draw.line([(x, y + arrow_len), (x - 8, y + arrow_len - 8)], fill=(0, 0, 0), width=3)
+        draw.line([(x, y + arrow_len), (x + 8, y + arrow_len - 8)], fill=(0, 0, 0), width=3)
+    if "left" in direction:
+        # Left arrow
+        draw.line([(x - arrow_len, y), (x + arrow_len, y)], fill=(0, 0, 0), width=3)
+        draw.line([(x - arrow_len, y), (x - arrow_len + 8, y - 8)], fill=(0, 0, 0), width=3)
+        draw.line([(x - arrow_len, y), (x - arrow_len + 8, y + 8)], fill=(0, 0, 0), width=3)
+    if "right" in direction:
+        # Right arrow
+        draw.line([(x - arrow_len, y), (x + arrow_len, y)], fill=(0, 0, 0), width=3)
+        draw.line([(x + arrow_len, y), (x + arrow_len - 8, y - 8)], fill=(0, 0, 0), width=3)
+        draw.line([(x + arrow_len, y), (x + arrow_len - 8, y + 8)], fill=(0, 0, 0), width=3)
+
+    # Draw page number below marker
+    page_text = str(page_num)
+    bbox = draw.textbbox((0, 0), page_text, font=font_bold)
+    text_width = bbox[2] - bbox[0]
+    text_x = x - text_width // 2
+    text_y = y + marker_size//2 + 5
+
+    draw.text((text_x, text_y), page_text, font=font_bold, fill=(255, 255, 255))
+    draw.text((text_x, text_y), page_text, font=font_small, fill=(0, 0, 0))
+
+
+def calculate_page_direction(current_page, next_page):
+    """
+    Calculate the relative direction from current page to next page.
+
+    Args:
+        current_page: 2D array of (col, row) tuples for current page
+        next_page: 2D array of (col, row) tuples for next page
+
+    Returns:
+        direction: string like "up", "down", "left", "right", "up-left", etc.
+        position: (x, y) pixel position on current page where marker should be drawn
+    """
+    # Get center tile of each page
+    mid_col_idx = len(current_page) // 2
+    mid_row_idx = len(current_page[0]) // 2
+
+    current_center = current_page[mid_col_idx][mid_row_idx]
+    next_center = next_page[mid_col_idx][mid_row_idx]
+
+    # Calculate direction
+    col_diff = next_center[0] - current_center[0]
+    row_diff = next_center[1] - current_center[1]
+
+    direction = ""
+    if row_diff < -2:
+        direction += "up"
+    elif row_diff > 2:
+        direction += "down"
+
+    if col_diff < -2:
+        direction += "-left" if direction else "left"
+    elif col_diff > 2:
+        direction += "-right" if direction else "right"
+
+    if not direction:
+        direction = "right"  # Default if pages overlap completely
+
+    # Calculate position on current page (edge closest to next page)
+    page_width = len(current_page) * 256
+    page_height = len(current_page[0]) * 256
+
+    # Position marker at edge pointing to next page
+    if "right" in direction:
+        x = page_width - 80
+    elif "left" in direction:
+        x = 80
+    else:
+        x = page_width // 2
+
+    if "down" in direction:
+        y = page_height - 80
+    elif "up" in direction:
+        y = 80
+    else:
+        y = page_height // 2
+
+    return direction, (x, y)
+
+
 def annotate_image(image, number, position, rectangle_position):
     """
     Annotates a PIL image with a number at a specific position
@@ -444,27 +562,32 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
     gpx_points = {}
     page = [[(0, 0)] * NUMBER_ROWS for _ in range(NUMBER_COLUMNS)]
 
-    list_index_found = set()
+    list_index_found = []
+    seen_tiles = set()
     gpx_points = defaultdict(list)
 
     point_index = 0
     for track in gpx.tracks:
         for segment in track.segments:
             data = pd.DataFrame([(p.latitude, p.longitude) for p in segment.points], columns=['lat', 'long'])
-            
+
             cols, rows, offset_xs, offset_ys = vectorized_get_tile_number_from_coord(
                 data['lat'].values, data['long'].values, tile_source
             )
-            
+
             for i, (col, row, ox, oy) in enumerate(zip(cols, rows, offset_xs, offset_ys)):
                 point = segment.points[i]
                 # Add sequence number (point_index) to stored data
                 gpx_points[(col, row)].append((ox, oy, point.latitude, point_index))
-                list_index_found.add((col, row))
+
+                # Preserve chronological order: only add tile on first occurrence
+                if (col, row) not in seen_tiles:
+                    list_index_found.append((col, row))
+                    seen_tiles.add((col, row))
+
                 point_index += 1
 
-    # Convert set back to list if needed
-    list_index_found = list(list_index_found)
+    # list_index_found is already a list in GPS chronological order
 
     pages = get_filled_pages(list_index_found, NUMBER_COLUMNS, NUMBER_ROWS)
 
@@ -530,9 +653,45 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
         global_image = annotate_image(
             global_image, page_number, (20, 20), (20, 75, 20 + half_k_in_px, 80)
         )
-        
+
         image_pages_for_export.append(copy.deepcopy(global_image))
         page_number += 1
+
+    # Second pass: Add navigation markers
+    for idx in range(len(image_pages_for_export)):
+        image = image_pages_for_export[idx]
+        current_page_tiles = pages[idx]
+        draw = ImageDraw.Draw(image)
+
+        # Add "next page" marker
+        if idx < len(pages) - 1:
+            next_page_tiles = pages[idx + 1]
+            direction, position = calculate_page_direction(current_page_tiles, next_page_tiles)
+            draw_navigation_marker(draw, direction, position, idx + 2)  # idx+2 because pages are 1-indexed
+
+        # Add "previous page" marker
+        if idx > 0:
+            prev_page_tiles = pages[idx - 1]
+            # Reverse direction for previous
+            direction, position = calculate_page_direction(current_page_tiles, prev_page_tiles)
+            # Invert direction
+            inv_dir = direction.replace("up", "DOWN").replace("down", "UP").replace("left", "RIGHT").replace("right", "LEFT").replace("DOWN", "down").replace("UP", "up").replace("LEFT", "left").replace("RIGHT", "right")
+            # Use opposite edge for position
+            page_width = len(current_page_tiles) * 256
+            page_height = len(current_page_tiles[0]) * 256
+            if "right" in inv_dir:
+                x = page_width - 80
+            elif "left" in inv_dir:
+                x = 80
+            else:
+                x = page_width // 2
+            if "down" in inv_dir:
+                y = page_height - 80
+            elif "up" in inv_dir:
+                y = 80
+            else:
+                y = page_height // 2
+            draw_navigation_marker(draw, inv_dir, (x, y), idx)  # idx because pages are 1-indexed and we want previous
 
     file_name = "OUTPUT.pdf"
     timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H:%M:%S")

@@ -5,12 +5,12 @@ import math
 def put_tiles_in_pages (tiles,NUMBER_ROWS,NUMBER_COLUMNS):
     full_processed_list =  []
     pages=[]
-    for tile_of_ref in tiles : 
+    for tile_of_ref in tiles :
         if tile_of_ref not in full_processed_list:
             min_row = tile_of_ref[1]
             min_col = tile_of_ref[0]
             page_one = []
-            for idx, tile in enumerate(tiles) : 
+            for idx, tile in enumerate(tiles) :
                 if tile not in full_processed_list:
                     delta_x = min_row-tile[1]
                     delta_y = min_col-tile[0]
