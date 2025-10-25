@@ -31,7 +31,7 @@ streamlit_script_mount = modal.Mount.from_local_file(
     streamlit_script_local_path,
     streamlit_script_remote_path,
 )
-streamlit_utils_mount = modal.Mount.from_local_file("page_generation.py", "/root/page_geneneration.py" )
+streamlit_utils_mount = modal.Mount.from_local_file("page_generation.py", "/root/page_generation.py" )
 streamlit_env_mount = modal.Mount.from_local_file(".env", "/root/.env" )
 streamlit_icon_mount = modal.Mount.from_local_file("icon.ico", "/root/icon.ico" )
 streamlit_font_mount = modal.Mount.from_local_file("fonts/FreeMono.ttf", "/usr/share/fonts/truetype/freefont/FreeMono.ttf" )

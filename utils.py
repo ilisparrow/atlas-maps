@@ -19,6 +19,16 @@ import numpy as np
 import pandas as pd
 from page_generation import get_filled_pages
 
+load_dotenv()
+
+# Get DEBUG flag from environment
+DEBUG_LOGGING = os.getenv("DEBUG_LOGGING", "false").lower() == "true"
+
+def debug_print(message):
+    """Print debug messages only if DEBUG_LOGGING is enabled"""
+    if DEBUG_LOGGING:
+        print(message, flush=True)
+
 # DONE : We need 14 images per A4 paper sheet
 # DONE : Fixe weird bug, always saving the same image for TRACE
 # DONE : Fixe weird Offset
@@ -588,8 +598,31 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
                 point_index += 1
 
     # list_index_found is already a list in GPS chronological order
+    import sys
+    import json
+    debug_print(f"[DEBUG] Total unique tiles: {len(list_index_found)}")
+    debug_print(f"[DEBUG] Total points processed: {point_index}")
+    debug_print(f"[DEBUG] First 12 tiles: {list_index_found[:12]}")
+    debug_print(f"[DEBUG] Calling get_filled_pages with COLUMNS={NUMBER_COLUMNS}, ROWS={NUMBER_ROWS}")
+    sys.stdout.flush()
+
+    # Write tiles to file for debugging (only if DEBUG enabled)
+    if DEBUG_LOGGING:
+        try:
+            with open('/tmp/tiles_debug.json', 'w') as f:
+                json.dump({
+                    'tile_count': len(list_index_found),
+                    'tiles': [(int(t[0]), int(t[1])) for t in list_index_found],
+                    'first_12': [(int(t[0]), int(t[1])) for t in list_index_found[:12]]
+                }, f)
+            debug_print(f"[DEBUG] Wrote debug to /tmp/tiles_debug.json")
+        except Exception as e:
+            debug_print(f"[DEBUG] Could not write debug file: {e}")
 
     pages = get_filled_pages(list_index_found, NUMBER_COLUMNS, NUMBER_ROWS)
+    debug_print(f"[DEBUG] Number of pages generated: {len(pages)}")
+    debug_print(f"[DEBUG] Tiles per page: {[len(p) for p in pages]}")
+    sys.stdout.flush()
 
     global_image = None
     image_pages_for_export = []
@@ -698,6 +731,9 @@ async def main(gpx, tile_source=TILE_SOURCE, line_color=LINE_COLOR):
     output_dir_pdf_path = "./output/PDFs/"
     os.makedirs(output_dir_pdf_path, exist_ok=True)
     file_name = output_dir_pdf_path + timestamp + ".pdf"
+
+    debug_print(f"[DEBUG] Final page count for PDF export: {len(image_pages_for_export)}")
+
     if len(image_pages_for_export) == 0:
         file_name = None
     elif len(image_pages_for_export) == 1:
