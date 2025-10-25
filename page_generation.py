@@ -34,20 +34,33 @@ def put_tiles_in_pages(tiles, NUMBER_ROWS, NUMBER_COLUMNS):
 
     for tile_of_ref in tiles:
         if tile_of_ref not in full_processed_list:
+            # Track the extent of the current page
             min_row = tile_of_ref[1]
             min_col = tile_of_ref[0]
+            max_row = tile_of_ref[1]
+            max_col = tile_of_ref[0]
             page_one = []
 
             for idx, tile in enumerate(tiles):
                 if tile not in full_processed_list:
-                    delta_x = min_row - tile[1]
-                    delta_y = min_col - tile[0]
+                    # Calculate what the new extent would be if we add this tile
+                    new_min_row = min(min_row, tile[1])
+                    new_max_row = max(max_row, tile[1])
+                    new_min_col = min(min_col, tile[0])
+                    new_max_col = max(max_col, tile[0])
 
-                    if (abs(delta_y) < NUMBER_COLUMNS and abs(delta_x) < NUMBER_ROWS):
+                    # Check if the total span would exceed the page limits
+                    row_span = new_max_row - new_min_row
+                    col_span = new_max_col - new_min_col
+
+                    if (col_span < NUMBER_COLUMNS and row_span < NUMBER_ROWS):
                         page_one.append(tile)
                         full_processed_list.append(tile)
-                        min_col = tile[0] if tile[0] < min_col else min_col
-                        min_row = tile[1] if tile[1] < min_row else min_row
+                        # Update the extent to include this tile
+                        min_row = new_min_row
+                        max_row = new_max_row
+                        min_col = new_min_col
+                        max_col = new_max_col
 
             pages.append(page_one)
 
