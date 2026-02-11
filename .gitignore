@@ -4,4 +4,7 @@ properties.env
 .env
 OUTPUT.pdf
 LOCAL_ENV_HELPER
-__pycache__test_output/
+__pycache__/
+test_output/
+tests/__pycache__/
+*.pyc
