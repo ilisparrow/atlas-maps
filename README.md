@@ -93,6 +93,30 @@ Contributions welcome. Please ensure tests pass before submitting pull requests.
 pytest tests/test_page_generation.py
 ```
 
+## Task List
+
+- [x] Configure 14 images per A4 paper sheet
+- [x] Fix bug with saving the same image for TRACE
+- [x] Fix offset issues
+- [x] Move key to environment variables
+- [x] Add page numbers and scale
+- [x] Add PDF export functionality
+- [x] Performance optimization with async processing
+- [x] Implement UI
+- [x] Add progress bar with sttqdm
+- [x] Make color and line thickness configurable
+- [ ] Add Portrait/Landscape orientation choice
+- [ ] Make number of tiles variable
+- [ ] Add A4/A3 paper size options
+- [x] Clean and refactor codebase
+- [x] Optimize by fetching all page images at once
+- [x] Add choice between OSM and IGN maps
+- [ ] Add optional legend page
+- [x] Add choice of color for the Trace
+- [x] Add Open Topo Map
+- [ ] When multiple segments of gpx but unrelated, they are still connected
+- [ ] Check if the scale is always correct
+
 ## License
 
 See LICENSE file.
